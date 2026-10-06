@@ -1,0 +1,30 @@
+{
+  "name": "jahanchord",
+  "version": "1.0.0",
+  "description": "A pocket chord synth for the iPad",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test:theory": "node scripts/test-theory.mjs",
+    "test:ipad": "node scripts/ipad-test.mjs shots",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/achala91-glitch/random2.git"
+  },
+  "bugs": {
+    "url": "https://github.com/achala91-glitch/random2/issues"
+  },
+  "homepage": "https://github.com/achala91-glitch/random2#readme",
+  "dependencies": {
+    "tone": "^15.1.22"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "vite": "^6.4.4"
+  },
+  "private": true,
+  "type": "module"
+}

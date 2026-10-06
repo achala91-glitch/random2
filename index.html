@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>JahanChord</title>
+  <meta name="description" content="A pocket chord synth. Seven buttons, one joystick, no wrong notes." />
+  <meta name="theme-color" content="#2b2622" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="JahanChord" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=VT323&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <button class="topbtn" id="learnBtn" type="button"><span class="dot"></span>Learn</button>
+      <button class="topbtn" id="settingsBtn" type="button">Settings</button>
+    </header>
+
+    <main id="stage">
+      <div id="deviceWrap">
+        <div id="device" class="device landscape">
+          <div class="d-brand">
+            <div class="brandmark">JahanChord<span class="model">JC-7 &middot; pocket chord synth</span></div>
+            <div class="screws"><i></i><i></i></div>
+            <div class="saved" title="Not spent on a synth">Saved: &#8377;30,000</div>
+          </div>
+
+          <div class="d-fn">
+            <div class="fn-buttons">
+              <button class="fn mustard" id="keyBtn" data-hint="key" type="button"><span>KEY</span></button>
+              <button class="fn mustard" id="soundBtn" data-hint="sound" type="button"><span>SOUND</span></button>
+              <button class="fn mustard" id="arpBtn" data-hint="arp" type="button"><span>ARP</span></button>
+            </div>
+            <div class="fn-labels"><span id="fnKey">C</span><span id="fnSound">Pad</span><span id="fnArp">Off</span></div>
+          </div>
+
+          <div class="d-screen">
+            <div class="screen" id="screen">
+              <div class="scr-top">
+                <span id="scrKey">KEY C</span>
+                <span id="scrPreset">PAD</span>
+                <span id="scrBpm">92 BPM</span>
+                <span id="scrArp">ARP OFF</span>
+              </div>
+              <div class="scr-main">
+                <div class="scr-roman" id="scrRoman"></div>
+                <div class="scr-chord" id="scrChord">ready</div>
+                <div class="scr-mod" id="scrMod"></div>
+              </div>
+              <div class="scr-notes" id="scrNotes">press a button</div>
+              <div class="scr-bottom">
+                <span class="beats" id="scrBeats"><i></i><i></i><i></i><i></i></span>
+                <span id="scrDrums"></span>
+                <span id="scrLoop"></span>
+                <span id="scrGuide"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-mix">
+            <div class="fader" id="volFader" data-hint="volume">
+              <div class="fader-label"><span>VOLUME</span><b id="volVal">80</b></div>
+              <div class="fader-track"><div class="fader-fill"></div><div class="fader-cap"></div></div>
+            </div>
+            <div class="fader" id="tempoFader" data-hint="tempo">
+              <div class="fader-label"><span>TEMPO</span><b id="tempoVal">92</b></div>
+              <div class="fader-track"><div class="fader-fill"></div><div class="fader-cap"></div></div>
+            </div>
+            <div class="grille" aria-hidden="true"></div>
+          </div>
+
+          <div class="d-joy">
+            <div class="joystick" id="joy" data-hint="joy">
+              <div class="joy-well">
+                <span class="jl u">7th</span><span class="jl ur">9</span><span class="jl r">add9</span><span class="jl dr">aug</span>
+                <span class="jl d">flip</span><span class="jl dl">dim</span><span class="jl l">sus4</span><span class="jl ul">sus2</span>
+                <div class="joy-guide" id="joyGuide"></div>
+                <div class="joy-knob" id="joyKnob"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-chords" id="chords"></div>
+
+          <div class="d-strip">
+            <div class="group">
+              <span class="glabel">DRUMS</span>
+              <button class="sbtn" id="drumsBtn" data-hint="drums" type="button"><i class="led"></i>ON</button>
+              <button class="sbtn wide" id="kitBtn" data-hint="kit" type="button"><small>kit</small><b id="kitVal">Lo-Fi</b></button>
+              <button class="sbtn wide" id="beatBtn" data-hint="beat" type="button"><small>beat</small><b id="beatVal">Pop</b></button>
+            </div>
+            <div class="group">
+              <span class="glabel">LOOP</span>
+              <button class="sbtn brick" id="recBtn" data-hint="rec" type="button"><i class="led"></i>REC</button>
+              <button class="sbtn" id="playBtn" type="button"><i class="led"></i>PLAY</button>
+              <button class="sbtn" id="clearBtn" type="button">CLEAR</button>
+              <button class="sbtn brick" id="dropBtn" data-hint="drop" type="button"><i class="led"></i>DROP</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="toasts" aria-live="polite"></div>
+    </main>
+
+    <aside id="learn" class="panel" aria-hidden="true">
+      <div class="panel-inner">
+        <div class="panel-head">
+          <h2 id="learnTitle">Learn</h2>
+          <button class="close" id="learnClose" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="panel-body" id="learnBody"></div>
+      </div>
+    </aside>
+
+    <div id="settings" class="sheet" aria-hidden="true">
+      <div class="sheet-card">
+        <div class="panel-head">
+          <h2>Settings</h2>
+          <button class="close" id="settingsClose" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="sheet-body">
+          <section>
+            <h3>Key</h3>
+            <div class="keygrid" id="keyGrid"></div>
+          </section>
+          <section>
+            <h3>Arpeggiator speed</h3>
+            <div class="seg" id="arpRateSeg">
+              <button type="button" data-v="8n">8th notes</button>
+              <button type="button" data-v="16n">16th notes</button>
+            </div>
+          </section>
+          <section class="toggles">
+            <label class="toggle"><input type="checkbox" id="optCommentary" /><span class="sw"></span>
+              <span><b>Wife commentary</b><small>Occasional remarks about your playing. Dry, affectionate, unsolicited.</small></span></label>
+            <label class="toggle"><input type="checkbox" id="optNotes" /><span class="sw"></span>
+              <span><b>Show notes on screen</b><small>See which notes each chord is made of.</small></span></label>
+          </section>
+          <section>
+            <h3>Progress</h3>
+            <button class="plain" id="resetLessons" type="button">Reset lesson progress</button>
+          </section>
+          <section class="about">
+            <p>Seven buttons, always in key. Hold the joystick to colour the chord. Keyboard works too: keys 1 to 7, arrow keys for the stick.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="welcome" class="welcome">
+      <div class="welcome-card">
+        <div class="w-badge">JC-7</div>
+        <h1>JahanChord</h1>
+        <p class="w-sub" id="welcomeSub">A pocket chord synth. Seven buttons, one joystick, no wrong notes.</p>
+        <div class="w-tip"><span>Tip of the day</span><p id="tipText"></p></div>
+        <div class="w-start">Tap anywhere to start</div>
+        <p class="w-small">Volume up. Headphones make it sound twice as expensive.</p>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
