@@ -29,6 +29,15 @@ To update it later, build again and drag the new `dist` folder onto the same sit
 
 Alternative: connect this GitHub repo in Netlify ("Add new site" then "Import an existing project"), with build command `npm run build` and publish directory `dist`. It then redeploys on every push.
 
+## Or publish it on GitHub Pages
+
+This repo has a workflow (`.github/workflows/deploy.yml`) that builds and publishes the app on every push.
+
+1. On GitHub, open the repo, then **Settings**, then **Pages**.
+2. Under "Build and deployment", set **Source** to **GitHub Actions**.
+3. Open the **Actions** tab, pick "Deploy to GitHub Pages", and click **Run workflow** (or just push a commit).
+4. When it goes green, the app is live at https://achala91-glitch.github.io/random2/
+
 ## Add it to the iPad home screen
 
 1. Open the link in **Safari** (it has to be Safari).
