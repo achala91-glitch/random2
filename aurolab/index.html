@@ -195,9 +195,46 @@ h1,h2,h3{font-family:var(--disp);margin:0;}
 /* ---------- toast ---------- */
 .toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:#fff;font-size:13.5px;line-height:1.4;padding:10px 16px;border-radius:12px;width:max-content;max-width:calc(100vw - 32px);text-align:center;box-shadow:0 12px 30px rgba(0,40,55,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;}
 .toast.show{opacity:1;transform:translate(-50%,0);}
+
+/* ---------- loading screen ---------- */
+.boot{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+  background:radial-gradient(900px 520px at 50% 38%,#0B7A99 0%,#006380 48%,#004C63 100%);transition:opacity .38s ease;}
+.boot.out{opacity:0;pointer-events:none;}
+.boot.gone{display:none;}
+.boot-in{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px;}
+.boot-mark{width:74px;height:74px;animation:bootIn .6s cubic-bezier(.2,.8,.2,1) both;}
+.boot-mark svg{width:100%;height:100%;display:block;overflow:visible;}
+.boot-eye{transform-box:fill-box;transform-origin:center;animation:bootEye 1.6s ease-in-out infinite;}
+.boot-ring{transform-box:fill-box;transform-origin:center;fill:none;stroke:#fff;stroke-width:1.4;opacity:0;animation:bootRing 1.6s ease-out infinite;}
+.boot-wm{font-family:var(--disp);font-weight:700;letter-spacing:.14em;font-size:22px;margin-top:18px;animation:bootIn .6s .08s cubic-bezier(.2,.8,.2,1) both;}
+.boot-sub{font-size:12.5px;letter-spacing:.06em;color:#BFE0E7;margin-top:5px;animation:bootIn .6s .14s cubic-bezier(.2,.8,.2,1) both;}
+.boot-bar{width:184px;height:3px;border-radius:3px;background:rgba(255,255,255,.18);margin-top:30px;overflow:hidden;animation:bootIn .6s .2s both;}
+.boot-bar i{display:block;height:100%;width:0;border-radius:3px;background:#fff;transition:width .45s cubic-bezier(.4,0,.2,1);}
+.boot-msg{font-size:12.5px;color:#D5ECF1;margin-top:13px;min-height:18px;transition:opacity .2s;}
+.boot.quick .boot-bar,.boot.quick .boot-msg{visibility:hidden;}
+.boot-foot{position:absolute;left:0;right:0;bottom:calc(26px + env(safe-area-inset-bottom,0px));text-align:center;font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.55);}
+@keyframes bootIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes bootEye{0%,100%{transform:scale(1);}50%{transform:scale(.82);}}
+@keyframes bootRing{0%{opacity:.7;transform:scale(1);}100%{opacity:0;transform:scale(2.3);}}
+.btn-primary.loading{opacity:.85;cursor:default;transform:none;box-shadow:none;}
+.btn-primary .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;vertical-align:-3px;margin-right:9px;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){.boot-eye,.boot-ring,.boot-mark,.boot-wm,.boot-sub,.boot-bar{animation:none;}}
 </style>
 </head>
 <body>
+
+<!-- ============ LOADING SCREEN ============ -->
+<div id="boot" class="boot quick" role="status" aria-live="polite">
+  <div class="boot-in">
+    <div class="boot-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5 L45 44 L35.5 44 L24 22 L12.5 44 L3 44 Z" fill="currentColor"/><circle class="boot-ring" cx="24" cy="34.5" r="6.4"/><circle class="boot-eye" cx="24" cy="34.5" r="6.4" fill="currentColor"/></svg></div>
+    <div class="boot-wm">AUROLAB</div>
+    <div class="boot-sub">Sales Assistant</div>
+    <div class="boot-bar"><i id="bootFill"></i></div>
+    <div class="boot-msg" id="bootMsg"></div>
+  </div>
+  <div class="boot-foot">Ophthalmic Intelligence. Trusted Worldwide.</div>
+</div>
 
 <!-- ============ SIGN IN ============ -->
 <div id="signin">
@@ -211,7 +248,7 @@ h1,h2,h3{font-family:var(--disp);margin:0;}
     <div class="field"><label for="si-email">Work email</label><input id="si-email" type="email" placeholder="you@example.com" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="" onkeydown="if(event.key==='Enter')$('#si-pass').focus()"></div>
     <div class="field"><label for="si-pass">Password</label><input id="si-pass" type="password" placeholder="••••••••" autocomplete="current-password" value="" onkeydown="if(event.key==='Enter')signIn()"></div>
     <div class="si-err hidden" id="si-err" role="alert"></div>
-    <button class="btn-primary" onclick="signIn()">Sign in</button>
+    <button class="btn-primary" id="si-btn" onclick="signIn()">Sign in</button>
     <a class="forgot" href="#" onclick="event.preventDefault();toast('A reset link has been sent to your work email.')">Forgot password?</a>
     <div class="si-foot">For authorised Aurolab field staff</div>
   </div>
@@ -565,6 +602,7 @@ function bumpCount(){const c=JSON.parse(localStorage.getItem('al_stats')||'{}');
 
 /* ---------------- sign in ---------------- */
 function signIn(){
+  if(booting||$('#si-btn').disabled)return;
   const email=$('#si-email').value.trim().toLowerCase(), pass=$('#si-pass').value;
   const err=$('#si-err');
   if(email!==DEMO_EMAIL.toLowerCase()||pass!==DEMO_PASSWORD){
@@ -574,7 +612,8 @@ function signIn(){
   err.classList.add('hidden');
   USER={email:DEMO_EMAIL,name:DEMO_NAME,region:'',v:2};localStorage.setItem('al_user',JSON.stringify(USER));
   $('#si-email').value='';$('#si-pass').value='';
-  bootApp();
+  const btn=$('#si-btn');btn.classList.add('loading');btn.disabled=true;btn.innerHTML='<span class="spin"></span>Signing in';
+  setTimeout(()=>runBoot(BOOT_STEPS(),()=>{bootApp();btn.classList.remove('loading');btn.disabled=false;btn.textContent='Sign in';}),650);
 }
 ['#si-email','#si-pass'].forEach(id=>$(id).addEventListener('input',()=>$('#si-err').classList.add('hidden')));
 function signOut(){stopSpeaking();localStorage.removeItem('al_user');location.reload();}
@@ -865,7 +904,24 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor
 
 /* ---------------- boot ---------------- */
 if(canSpeak){try{speechSynthesis.getVoices();}catch(e){}}
-if(USER)bootApp();
+/* ---------------- loading screen ---------------- */
+const BOOT_STEPS=()=>[['Securing your session',420],[`Loading product library · ${KB.products.length} products`,600],['Syncing prices and brochures',460],[`Welcome, ${(USER&&USER.name||DEMO_NAME).split(' ')[0]}`,420]];
+const BOOT_FAST=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+let booting=false;
+/* steps: [[message, ms], ...]; ready() renders the screen underneath before the fade */
+function runBoot(steps,ready){
+  const b=$('#boot'),fill=$('#bootFill'),msg=$('#bootMsg');
+  booting=true;b.classList.remove('gone','out','quick');fill.style.width='0%';msg.textContent='';
+  let i=0;
+  const next=()=>{
+    if(i<steps.length){const [t,ms]=steps[i++];msg.textContent=t;fill.style.width=Math.round(i/steps.length*100)+'%';setTimeout(next,BOOT_FAST?ms*.3:ms);return;}
+    try{ready&&ready();}finally{hideBoot();}
+  };
+  requestAnimationFrame(next);
+}
+function hideBoot(){const b=$('#boot');b.classList.add('out');setTimeout(()=>{b.classList.add('gone');booting=false;},400);}
+if(USER)runBoot(BOOT_STEPS(),bootApp);
+else setTimeout(hideBoot,BOOT_FAST?150:700);
 </script>
 </body>
 </html>

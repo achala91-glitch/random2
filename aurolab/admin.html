@@ -138,9 +138,46 @@ tr:last-child td{border-bottom:none;}
 .modal .box{background:#fff;border-radius:16px;padding:24px;width:420px;max-width:92vw;}
 .modal h3{font-size:17px;margin-bottom:16px;color:var(--teal-d);}
 @media(max-width:1000px){.stat-row{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.ctab{grid-template-columns:1fr;height:auto;}.ed-grid{grid-template-columns:1fr;}.ed-field.full{grid-column:1;}}
+
+/* ---------- loading screen ---------- */
+.boot{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+  background:radial-gradient(900px 520px at 50% 38%,#0B7A99 0%,#006380 48%,#004C63 100%);transition:opacity .38s ease;}
+.boot.out{opacity:0;pointer-events:none;}
+.boot.gone{display:none;}
+.boot-in{display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px;}
+.boot-mark{width:74px;height:74px;animation:bootIn .6s cubic-bezier(.2,.8,.2,1) both;}
+.boot-mark svg{width:100%;height:100%;display:block;overflow:visible;}
+.boot-eye{transform-box:fill-box;transform-origin:center;animation:bootEye 1.6s ease-in-out infinite;}
+.boot-ring{transform-box:fill-box;transform-origin:center;fill:none;stroke:#fff;stroke-width:1.4;opacity:0;animation:bootRing 1.6s ease-out infinite;}
+.boot-wm{font-family:var(--disp);font-weight:700;letter-spacing:.14em;font-size:22px;margin-top:18px;animation:bootIn .6s .08s cubic-bezier(.2,.8,.2,1) both;}
+.boot-sub{font-size:12.5px;letter-spacing:.06em;color:#BFE0E7;margin-top:5px;animation:bootIn .6s .14s cubic-bezier(.2,.8,.2,1) both;}
+.boot-bar{width:184px;height:3px;border-radius:3px;background:rgba(255,255,255,.18);margin-top:30px;overflow:hidden;animation:bootIn .6s .2s both;}
+.boot-bar i{display:block;height:100%;width:0;border-radius:3px;background:#fff;transition:width .45s cubic-bezier(.4,0,.2,1);}
+.boot-msg{font-size:12.5px;color:#D5ECF1;margin-top:13px;min-height:18px;transition:opacity .2s;}
+.boot.quick .boot-bar,.boot.quick .boot-msg{visibility:hidden;}
+.boot-foot{position:absolute;left:0;right:0;bottom:calc(26px + env(safe-area-inset-bottom,0px));text-align:center;font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.55);}
+@keyframes bootIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes bootEye{0%,100%{transform:scale(1);}50%{transform:scale(.82);}}
+@keyframes bootRing{0%{opacity:.7;transform:scale(1);}100%{opacity:0;transform:scale(2.3);}}
+.btn-primary.loading{opacity:.85;cursor:default;transform:none;box-shadow:none;}
+.btn-primary .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;vertical-align:-3px;margin-right:9px;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){.boot-eye,.boot-ring,.boot-mark,.boot-wm,.boot-sub,.boot-bar{animation:none;}}
 </style>
 </head>
 <body>
+
+<!-- ============ LOADING SCREEN ============ -->
+<div id="boot" class="boot quick" role="status" aria-live="polite">
+  <div class="boot-in">
+    <div class="boot-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 5 L45 44 L35.5 44 L24 22 L12.5 44 L3 44 Z" fill="currentColor"/><circle class="boot-ring" cx="24" cy="34.5" r="6.4"/><circle class="boot-eye" cx="24" cy="34.5" r="6.4" fill="currentColor"/></svg></div>
+    <div class="boot-wm">AUROLAB</div>
+    <div class="boot-sub">Sales Assistant · Admin</div>
+    <div class="boot-bar"><i id="bootFill"></i></div>
+    <div class="boot-msg" id="bootMsg"></div>
+  </div>
+  <div class="boot-foot">Ophthalmic Intelligence. Trusted Worldwide.</div>
+</div>
 
 <div id="signin">
   <div class="card">
@@ -151,7 +188,7 @@ tr:last-child td{border-bottom:none;}
     <div class="field"><label for="si-email">Admin email</label><input id="si-email" type="email" placeholder="you@example.com" autocomplete="username" autocapitalize="off" spellcheck="false" value="" onkeydown="if(event.key==='Enter')$('#si-pass').focus()"></div>
     <div class="field"><label for="si-pass">Password</label><input id="si-pass" type="password" placeholder="••••••••" autocomplete="current-password" value="" onkeydown="if(event.key==='Enter')signIn()"></div>
     <div class="si-err hidden" id="si-err" role="alert"></div>
-    <button class="btn-primary" onclick="signIn()">Sign in</button>
+    <button class="btn-primary" id="si-btn" onclick="signIn()">Sign in</button>
   </div>
 </div>
 
@@ -211,12 +248,14 @@ function saveReps(){localStorage.setItem('al_reps',JSON.stringify(REPS));}
 let ADMIN=JSON.parse(localStorage.getItem('al_admin')||'null');
 if(ADMIN&&(ADMIN.v!==2||ADMIN.email!==DEMO_EMAIL)){ADMIN=null;localStorage.removeItem('al_admin');}
 function signIn(){
+  if(booting||$('#si-btn').disabled)return;
   const e=$('#si-email').value.trim().toLowerCase(),pw=$('#si-pass').value,err=$('#si-err');
   if(e!==DEMO_EMAIL.toLowerCase()||pw!==DEMO_PASSWORD){err.textContent='Please check your details and try again.';err.classList.remove('hidden');$('#si-pass').value='';$('#si-pass').focus();return;}
   err.classList.add('hidden');
   ADMIN={email:DEMO_EMAIL,name:'Admin',v:2};localStorage.setItem('al_admin',JSON.stringify(ADMIN));
   $('#si-email').value='';$('#si-pass').value='';
-  boot();
+  const btn=$('#si-btn');btn.classList.add('loading');btn.disabled=true;btn.innerHTML='<span class="spin"></span>Signing in';
+  setTimeout(()=>runBoot(BOOT_STEPS(),()=>{boot();btn.classList.remove('loading');btn.disabled=false;btn.textContent='Sign in';}),650);
 }
 ['#si-email','#si-pass'].forEach(id=>$(id).addEventListener('input',()=>$('#si-err').classList.add('hidden')));
 function signOut(){localStorage.removeItem('al_admin');location.reload();}
@@ -322,7 +361,24 @@ function reindex(el){el.innerHTML='Re-indexing…';setTimeout(()=>{el.innerHTML=
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function titleCase(s){return s.replace(/\b\w/g,c=>c.toUpperCase());}
 
-if(ADMIN)boot();
+/* ---------------- loading screen ---------------- */
+const BOOT_STEPS=()=>[['Verifying admin access',420],['Loading field activity',520],[`Syncing content library · ${KB.products.length} products`,560],['Preparing your dashboard',420]];
+const BOOT_FAST=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+let booting=false;
+/* steps: [[message, ms], ...]; ready() renders the screen underneath before the fade */
+function runBoot(steps,ready){
+  const b=$('#boot'),fill=$('#bootFill'),msg=$('#bootMsg');
+  booting=true;b.classList.remove('gone','out','quick');fill.style.width='0%';msg.textContent='';
+  let i=0;
+  const next=()=>{
+    if(i<steps.length){const [t,ms]=steps[i++];msg.textContent=t;fill.style.width=Math.round(i/steps.length*100)+'%';setTimeout(next,BOOT_FAST?ms*.3:ms);return;}
+    try{ready&&ready();}finally{hideBoot();}
+  };
+  requestAnimationFrame(next);
+}
+function hideBoot(){const b=$('#boot');b.classList.add('out');setTimeout(()=>{b.classList.add('gone');booting=false;},400);}
+if(ADMIN)runBoot(BOOT_STEPS(),boot);
+else setTimeout(hideBoot,BOOT_FAST?150:700);
 </script>
 </body>
 </html>
