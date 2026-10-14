@@ -79,9 +79,9 @@ h1,h2,h3,h4{font-family:var(--disp);margin:0;}
 .toplist .row{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
 .toplist .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 .toplist .nm{font-size:13.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.toplist .track{width:90px;height:7px;background:var(--chip);border-radius:7px;overflow:hidden;}
-.toplist .fill{height:100%;border-radius:7px;}
-.toplist .ct{font-size:12px;color:var(--muted);width:26px;text-align:right;}
+.toplist .track{width:140px;flex-shrink:0;height:7px;background:var(--chip);border-radius:7px;overflow:hidden;}
+.toplist .fill{display:block;height:100%;border-radius:7px;transition:width .5s ease;}
+.toplist .ct{font-size:12px;color:var(--muted);width:34px;text-align:right;font-variant-numeric:tabular-nums;}
 .gap-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
 .gap-row .q{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .gap-row button{font-size:12px;font-weight:600;color:var(--teal);background:var(--chip);padding:5px 11px;border-radius:8px;white-space:nowrap;}
@@ -119,7 +119,6 @@ tr:last-child td{border-bottom:none;}
 .ed-field input,.ed-field textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13.5px;color:var(--ink);}
 .ed-field textarea{resize:vertical;min-height:70px;line-height:1.5;}
 .ed-field.full{grid-column:1/3;}
-.priceflag{font-size:11px;color:var(--cornea);margin-top:5px;}
 .reindex{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--teal);background:var(--chip);padding:8px 13px;border-radius:9px;margin-top:4px;}
 .subh{font-family:var(--disp);font-weight:600;font-size:14px;color:var(--teal-d);margin:22px 0 10px;display:flex;align-items:center;justify-content:space-between;}
 .q-item{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px;}
@@ -138,7 +137,6 @@ tr:last-child td{border-bottom:none;}
 .modal.show{display:flex;}
 .modal .box{background:#fff;border-radius:16px;padding:24px;width:420px;max-width:92vw;}
 .modal h3{font-size:17px;margin-bottom:16px;color:var(--teal-d);}
-.banner{background:#FEF6E8;border:1px solid #F6E0B0;color:#8A6A1E;font-size:12.5px;padding:10px 14px;border-radius:10px;margin-bottom:18px;}
 @media(max-width:1000px){.stat-row{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.ctab{grid-template-columns:1fr;height:auto;}.ed-grid{grid-template-columns:1fr;}.ed-field.full{grid-column:1;}}
 </style>
 </head>
@@ -245,7 +243,12 @@ function renderDash(){
   const allGaps=[...gaps,...seededGaps].slice(0,6);
   const active=3+Math.floor(Math.random()*5);
   // top products
-  const tp=[['Aurolab Essence','CATARACT'],['Aurovue','CATARACT'],['AADI 350','GLAUCOMA'],['Aurosil 1500','RETINAL'],['Aurolab Dfine','CATARACT'],['Aurolab Polycryl','GENERAL']];
+  // baseline field counts plus every product answer given in the rep app (al_hits)
+  const base={'Aurolab Essence':130,'Aurovue':113,'AADI 350':96,'Aurosil 1500':79,'Aurolab Dfine':62,'Aurolab Polycryl':46};
+  const hits=JSON.parse(localStorage.getItem('al_hits')||'{}');
+  const counts={};KB.products.forEach(p=>{const n=(base[p.name]||0)+(hits[p.id]||0);if(n)counts[p.id]=n;});
+  const tp=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,6).map(id=>{const p=KB.products.find(x=>x.id===id);return [p.name,p.speciality,counts[id]];});
+  const tpMax=tp.length?tp[0][2]:1;
   const max=92;
   $('#view').innerHTML=`
    <div class="stat-row">
@@ -256,7 +259,7 @@ function renderDash(){
    </div>
    <div class="grid2">
      <div class="panel"><h3>Questions per day · last 14 days</h3><div class="chart">${days.map(d=>`<div class="bar" style="height:${Math.round(d.v/max*100)}%"><span>${d.label}</span></div>`).join('')}</div><div style="height:16px"></div></div>
-     <div class="panel"><h3>Most asked about</h3><div class="toplist">${tp.map((t,i)=>{const pct=100-i*13;const c=specColor(t[1]);return `<div class="row"><span class="dot" style="background:${c}"></span><span class="nm">${t[0]}</span><span class="track"><span class="fill" style="width:${pct}%;background:${c}"></span></span><span class="ct">${Math.round(pct*1.3)}</span></div>`;}).join('')}</div></div>
+     <div class="panel"><h3>Most asked about</h3><div class="toplist">${tp.map(t=>{const pct=Math.max(4,Math.round(t[2]/tpMax*100));const c=specColor(t[1]);return `<div class="row"><span class="dot" style="background:${c}"></span><span class="nm">${t[0]}</span><span class="track"><span class="fill" style="width:${pct}%;background:${c}"></span></span><span class="ct">${t[2].toLocaleString('en-IN')}</span></div>`;}).join('')}</div></div>
    </div>
    <div class="panel" style="margin-top:16px"><h3>Gaps to fill <span style="font-size:12px;font-weight:500;color:var(--faint)">· questions the assistant could not answer</span></h3>
      ${allGaps.map(g=>`<div class="gap-row"><span class="q">${esc(g.q)}</span><button onclick="go('content')">Add answer &rarr;</button></div>`).join('')||'<div style="color:var(--faint);font-size:13px;padding:8px 0">No gaps. Nice.</div>'}
@@ -291,8 +294,7 @@ function renderContent(){
     tree+=`<div class="div-h">${label}</div>`;
     Object.keys(specs).forEach(sp=>{tree+=`<div class="spec-h"><span class="d" style="background:${specColor(sp)}"></span>${titleCase(sp.toLowerCase())}</div>`;
       specs[sp].forEach(p=>{tree+=`<div class="pitem" data-id="${p.id}" data-name="${esc(p.name.toLowerCase())}" onclick="selectProd('${p.id}')"><span class="pd" style="background:${specColor(p.speciality)}"></span>${esc(p.name)}</div>`;});});});
-  $('#view').innerHTML=`<div class="banner">Prices shown are indicative placeholder values. Replace with official Aurolab pricing before any customer-facing use.</div>
-    <div class="ctab"><div class="tree" id="tree">${tree}</div><div class="editor" id="editor"></div></div>`;
+  $('#view').innerHTML=`    <div class="ctab"><div class="tree" id="tree">${tree}</div><div class="editor" id="editor"></div></div>`;
   selectProd(selProd);
 }
 function filterTree(v){v=v.toLowerCase();document.querySelectorAll('#tree .pitem').forEach(el=>{el.style.display=el.dataset.name.includes(v)?'':'none';});}
@@ -305,7 +307,7 @@ function selectProd(id){selProd=id;const p=KB.products.find(x=>x.id===id);
    <h2>${esc(p.name)}</h2><div class="tl">${esc(p.tagline||p.category)}</div>
    <div class="ed-grid">
      <div class="ed-field"><label>Composition / type</label><input value="${esc(p.subName||'')}"></div>
-     <div class="ed-field"><label>Price (INR, indicative)</label><input value="${esc(p.priceDisplay)}"><div class="priceflag">placeholder · replace before use</div></div>
+     <div class="ed-field"><label>Price (INR)</label><input value="${esc(p.priceDisplay)}"></div>
      <div class="ed-field full"><label>Description</label><textarea>${esc(p.description||'')}</textarea></div>
      <div class="ed-field full"><label>Highlights</label><textarea>${esc((p.highlights||[]).join('\n'))}</textarea></div>
    </div>

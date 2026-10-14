@@ -190,7 +190,7 @@ h1,h2,h3{font-family:var(--disp);margin:0;}
 .rg-item .pr{font-family:var(--disp);font-weight:600;font-size:13.5px;color:var(--teal-d);white-space:nowrap;}
 .rg-item .chev{color:var(--faint);flex-shrink:0;}
 .rg-hint{font-size:12px;color:var(--faint);margin-top:12px;}
-@media(max-width:380px){.rg-item .pr{display:none;}}
+@media(max-width:380px){.rg-item{gap:9px;padding:10px;}.rg-item .pr{font-size:12.5px;}}
 
 /* ---------- toast ---------- */
 .toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:#fff;font-size:13.5px;line-height:1.4;padding:10px 16px;border-radius:12px;width:max-content;max-width:calc(100vw - 32px);text-align:center;box-shadow:0 12px 30px rgba(0,40,55,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;}
@@ -332,9 +332,10 @@ function answer(query){
   let bg=null,bgr=0;
   for(const gi of GENS){const o=overlap(qt,new Set(gi.t));const r=o/Math.max(gi.t.length,qt.length);if(o>=2&&r>bgr){bgr=r;bg=gi.g;}}
 
-  // range / list questions ("what are all the IOLs", "glaucoma drops", "list your sutures")
+  // price questions ("cheapest product", "IOLs under ₹5,000") and range / list questions ("what are all the IOLs")
   if(!np&&!(bg&&bgr>=0.6)){
     const nq2=norm(query);
+    const pr=priceAnswer(query,qt);if(pr)return pr;
     const specificName=bp&&PROD.find(x=>x.p===bp).nameT.some(w=>qset.has(w)&&!GENERIC_NAME.has(w)&&!LIST_PLURAL.test(w)&&!DIV_FACETS.some(f=>f[1].test(w))&&!SPEC_FACETS.some(f=>f[1].test(w)));
     if(LIST_STRONG.test(nq2)||(LIST_PLURAL.test(nq2)&&!specificName)){const r=rangeAnswer(query,qt);if(r)return r;}
   }
@@ -414,7 +415,8 @@ const GENERIC_NAME=new Set('aurolab auro eye eyes anti drops drop lens lenses io
 const LIST_WORDS=new Set('all list lists range ranges type types kind kinds different variety varieties option options portfolio catalog catalogue lineup line full entire complete available offer offers offering sell supply supplies have show give tell about which what product products aurolab there make manufacture please category categories'.split(' '));
 function stem(w){return w.replace(/(es|s)$/,'');}
 
-function rangeAnswer(query,qt){
+/* products matching the range words in a question (null when it names no range) */
+function facetSet(query,qt){
   const q=norm(query);
   const divs=DIV_FACETS.filter(f=>f[1].test(q));
   // "spectacle lens" is an optical, not an IOL
@@ -429,27 +431,100 @@ function rangeAnswer(query,qt){
   [...DIV_FACETS.map(f=>f[1]),...CAT_FACETS.map(f=>f[0]),...SPEC_FACETS.map(f=>f[1])].forEach(re=>qt.forEach(w=>{if(re.test(w))facetWords.add(w);}));
   ['drops','drop'].forEach(w=>facetWords.delete(w));
   const catText=list.map(p=>p.category.toLowerCase()).join(' ');
-  const extra=qt.filter(w=>!LIST_WORDS.has(w)&&!facetWords.has(w)&&!/^(do|you|your|we|us|our|for|got|need|want|eye|eyes|me)$/.test(w)&&!catText.includes(w));
+  const extra=qt.filter(w=>!LIST_WORDS.has(w)&&!PRICE_WORDS.has(w)&&!/^\d/.test(w)&&!facetWords.has(w)&&!/^(do|you|your|we|us|our|for|got|need|want|eye|eyes|me)$/.test(w)&&!catText.includes(w));
   const used=[];
   extra.forEach(w=>{const st=stem(w);const f=list.filter(p=>PBYID[p.id]&&PROD_DOC[p.id].some(d=>stem(d)===st));if(f.length&&f.length<list.length){list=f;used.push(w);}});
-  if(!list.length)return null;
-  if(list.length===1)return mk('',list[0]);
-  // what to call this set
+  return {q,list,divSet,cats,specs,used};
+}
+/* what to call a set of products, e.g. "Glaucoma eye drops" */
+function rangeNoun(fs){
+  const {q,list,divSet,cats,specs,used}=fs;
   let noun;
   if(cats.length){const cs=[...new Set(list.map(p=>fixCat(p.category)))];noun=cs.length===1?cs[0]:'products';}
   else if(divSet.size===1){noun=DIV_FACETS.find(f=>f[0]===[...divSet][0])[2];}
   else noun='products';
-  const specTxt=specs.size?[...specs].map(s=>titleCase(s.toLowerCase())).join(' and ')+' ':'';
+  const specTxt=specs.size?[...specs].map(s=>s.toLowerCase()).join(' and ')+' ':'';
   const shown=used.filter(w=>!/^drops?$/.test(w));
   if(/\bdrops?\b/.test(q)&&divSet.size===1&&divSet.has('PHARMA')&&!cats.length)noun='eye drops';
   const forTxt=shown.length?` for "${shown.join(' ')}"`:'';
+  return specTxt+noun+forTxt;
+}
+function rangeAnswer(query,qt){
+  const fs=facetSet(query,qt);if(!fs||!fs.list.length)return null;
+  const {list,divSet,cats}=fs;
+  if(list.length===1)return mk('',list[0]);
   const groupBy=divSet.size===1||cats.length?'category':'division';
   const ng=new Set(list.map(p=>groupBy==='category'?fixCat(p.category):p.division)).size;
-  const lead=`Aurolab offers ${list.length} ${specTxt}${noun}${forTxt}`+(ng>1?`, across ${ng} ${groupBy==='category'?'types':'divisions'}.`:'.');
+  const lead=`Aurolab offers ${list.length} ${rangeNoun(fs)}`+(ng>1?`, across ${ng} ${groupBy==='category'?'types':'divisions'}.`:'.');
   return {found:true,text:lead,list:list.map(p=>p.id),groupBy};
+}
+/* ---------------- price questions: cheapest, most expensive, under / over / between, price range ---------------- */
+const PRICE_WORDS=new Set('cheapest cheap cheaper expensive costliest priciest costly affordable budget economical inexpensive price prices priced pricing cost costs lowest highest low high least most under below above over less more than within upto between and top sorted order rupees inr lakh lakhs'.split(' '));
+const PR_CHEAP_ONE=/\b(cheapest|least expensive|least costly|lowest[- ]?(price|priced|cost)|most affordable|most economical)\b/;
+const PR_CHEAP_MANY=/\b(cheaper|cheap|budget|affordable|economical|inexpensive|low[- ]?cost)\b/;
+const PR_EXP_ONE=/\b(most expensive|costliest|priciest|most costly|highest[- ]?(price|priced|cost))\b/;
+const PR_EXP_MANY=/\b(expensive|high[- ]?end)\b/;
+const AMT='(?:rs\\.?|inr|₹)?\\s*([\\d][\\d,]*(?:\\.\\d+)?)\\s*(k|lakhs?|l)?\\b';
+const PR_BTW=new RegExp('\\bbetween\\s*'+AMT+'\\s*(?:and|to|-)\\s*'+AMT);
+const PR_UNDER=new RegExp('\\b(?:under|below|less than|within|up ?to|cheaper than|max(?:imum)?|not more than)\\s*'+AMT);
+const PR_OVER=new RegExp('\\b(?:above|over|more than|greater than|at least|minimum)\\s*'+AMT);
+const PR_RANGE=/\b(price range|price list|prices of|pricing (for|of)|sorted by price|by price|price wise|pricewise)\b/;
+function amt(n,u){let v=parseFloat(String(n).replace(/,/g,''));if(u){u=u.toLowerCase();if(u==='k')v*=1e3;else v*=1e5;}return v;}
+function inr(v){return '₹'+Math.round(v).toLocaleString('en-IN');}
+const LIST_CAP=25;
+function priceList(ps,lead,title){
+  const out={found:true,text:lead,list:ps.slice(0,LIST_CAP).map(p=>p.id),groupBy:'price',title};
+  if(ps.length>LIST_CAP)out.note=`Showing ${LIST_CAP} of ${ps.length}. Ask about a specific range (for example "IOLs under ₹5,000") to narrow it down.`;
+  return out;
+}
+function priceAnswer(query,qt){
+  const ql=' '+query.toLowerCase().replace(/[?!]/g,' ')+' ';
+  const btw=ql.match(PR_BTW),under=!btw&&ql.match(PR_UNDER),over=!btw&&!under&&ql.match(PR_OVER);
+  const cheapOne=PR_CHEAP_ONE.test(ql),expOne=!cheapOne&&PR_EXP_ONE.test(ql);
+  const cheapMany=!cheapOne&&!expOne&&PR_CHEAP_MANY.test(ql),expMany=!cheapOne&&!expOne&&!cheapMany&&PR_EXP_MANY.test(ql)&&!/\bhow expensive\b/.test(ql);
+  const rng=PR_RANGE.test(ql);
+  if(!btw&&!under&&!over&&!cheapOne&&!expOne&&!cheapMany&&!expMany&&!rng)return null;
+  const fs=facetSet(query,qt);
+  if(fs&&!fs.list.length)return null;
+  const pool=(fs?fs.list:KB.products).filter(p=>typeof p.priceINR==='number');
+  if(!pool.length)return null;
+  const noun=fs?rangeNoun(fs):'products';
+  const scope=fs?`Aurolab's ${noun}`:'the Aurolab range';
+  const asc=pool.slice().sort((a,b)=>a.priceINR-b.priceINR),desc=asc.slice().reverse();
+  const q=norm(query);
+  const topN=+((q.match(/\btop (\d+)\b/)||q.match(/\b(\d+) (cheapest|most expensive|costliest|priciest|lowest|highest)\b/)||[])[1]||0);
+  const plural=topN>0||/\b(iols|lenses|sutures|blades|dyes|machines|instruments|frames|ointments|devices|options|products)\b/.test(q);
+  // a range of prices
+  if(btw||under||over){
+    let lo=0,hi=Infinity,label;
+    if(btw){lo=amt(btw[1],btw[2]);hi=amt(btw[3],btw[4]);if(lo>hi)[lo,hi]=[hi,lo];label=`between ${inr(lo)} and ${inr(hi)}`;}
+    else if(under){hi=amt(under[1],under[2]);label=`up to ${inr(hi)}`;}
+    else {lo=amt(over[1],over[2]);label=`above ${inr(lo)}`;}
+    const hit=(over?desc:asc).filter(p=>p.priceINR>=lo&&p.priceINR<=hi&&(!over||p.priceINR>lo));
+    if(!hit.length){
+      const near=under?asc[0]:over?desc[0]:asc.reduce((b,p)=>Math.abs(p.priceINR-lo)<Math.abs(b.priceINR-lo)?p:b,asc[0]);
+      return mk(`There's nothing in ${scope} priced ${label}. The closest is ${near.name} at ${near.priceDisplay}.`,near);
+    }
+    if(hit.length===1)return mk(`${hit[0].name} is the only one of ${scope} priced ${label}, at ${hit[0].priceDisplay}.`,hit[0]);
+    return priceList(hit,`${hit.length} of ${scope} are priced ${label}.`,over?'Highest price first':'Lowest price first');
+  }
+  // cheapest / most expensive: one product, or a short list when the question is plural
+  if(cheapOne||expOne){
+    const sorted=cheapOne?asc:desc,word=cheapOne?'most affordable':'most expensive';
+    if(plural||topN){const n=Math.min(topN||5,sorted.length);return priceList(sorted.slice(0,n),`The ${n} ${word} of ${scope}:`,cheapOne?'Lowest price first':'Highest price first');}
+    const best=sorted[0],ties=sorted.filter(p=>p.priceINR===best.priceINR);
+    if(ties.length>1)return priceList(ties,`The ${word} ${fs?'of '+scope:'products in the Aurolab range'} are priced at ${best.priceDisplay} each: ${ties.map(p=>p.name).join(', ')}.`,'Same price');
+    return mk(fs?`The ${word} of ${scope} is ${best.name}, at ${best.priceDisplay}.`:`The ${word} product in the Aurolab range is ${best.name}, at ${best.priceDisplay}.`,best);
+  }
+  // affordable / budget / expensive, or a price range: sorted list
+  const sorted=expMany?desc:asc;
+  const lead=rng||!fs?`${titleCase(fs?noun:'Aurolab products')} range from ${asc[0].priceDisplay} (${asc[0].name}) to ${desc[0].priceDisplay} (${desc[0].name}).`
+    :(expMany?`Here are ${scope} sorted by price, highest first.`:`Here are ${scope} sorted by price, most affordable first.`);
+  return priceList(sorted,lead,expMany?'Highest price first':'Lowest price first');
 }
 function rangeGroups(m){
   const ps=(m.list||[]).map(id=>PBYID[id]).filter(Boolean);
+  if(m.groupBy==='price')return [[m.title||'By price',ps]];
   const order=[],g={};
   ps.forEach(p=>{const k=m.groupBy==='division'?((KB.divisions.find(d=>d.id===p.division)||{}).label||p.division):fixCat(p.category);if(!g[k]){g[k]=[];order.push(k);}g[k].push(p);});
   return order.map(k=>[k,g[k]]);
@@ -470,6 +545,7 @@ function rangeEl(m){
     });
     sec.appendChild(ul);w.appendChild(sec);
   });
+  if(m.note)w.appendChild(mkEl('div','rg-hint',m.note));
   w.appendChild(mkEl('div','rg-hint','Tap any product for its full details, price and brochure. Prices are indicative.'));
   return w;
 }
@@ -484,6 +560,7 @@ let current=null;
 function persist(){localStorage.setItem('al_threads',JSON.stringify(THREADS));}
 function persistSet(){localStorage.setItem('al_set',JSON.stringify(SET));}
 function logGap(q){const g=JSON.parse(localStorage.getItem('al_gaps')||'[]');g.unshift({q,ts:Date.now()});localStorage.setItem('al_gaps',JSON.stringify(g.slice(0,100)));}
+function logHit(pid){if(!pid)return;const h=JSON.parse(localStorage.getItem('al_hits')||'{}');h[pid]=(h[pid]||0)+1;localStorage.setItem('al_hits',JSON.stringify(h));}
 function bumpCount(){const c=JSON.parse(localStorage.getItem('al_stats')||'{}');const d=new Date().toISOString().slice(0,10);c[d]=(c[d]||0)+1;localStorage.setItem('al_stats',JSON.stringify(c));}
 
 /* ---------------- sign in ---------------- */
@@ -704,6 +781,7 @@ function send(){
     ty.remove();
     let res=answer(q);
     if(!res){res={found:false,text:KB.fallbackBehaviour.exampleReply};logGap(q);}
+    logHit(res.pid);
     current.messages.push(Object.assign({role:'assistant'},res));
     persist();renderChat();
   },480+Math.random()*420);
