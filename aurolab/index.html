@@ -175,6 +175,23 @@ h1,h2,h3{font-family:var(--disp);margin:0;}
 @media(max-width:380px){.ans{padding:14px;}.pc-facts{grid-template-columns:1fr;}.pc-fact.full{grid-column:auto;}}
 @media(min-width:700px){.ans{padding:18px 22px;}.pc-name{font-size:21px;}.pc-fact{padding:10px 14px;}}
 
+/* ---------- product range list ---------- */
+.rg-group{margin-top:16px;}
+.rg-group h4{font-family:var(--disp);font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--teal);margin:0 0 6px;font-weight:600;}
+.rg-group h4 span{color:var(--faint);font-weight:500;letter-spacing:0;text-transform:none;font-family:var(--body);font-size:12px;margin-left:4px;}
+.rg-list{border:1px solid var(--line);border-radius:11px;overflow:hidden;}
+.rg-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 12px;background:#FAFCFC;border-bottom:1px solid var(--line);transition:background .14s;}
+.rg-item:last-child{border-bottom:none;}
+.rg-item:hover{background:var(--chip);}
+.rg-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.rg-item .nm{flex:1;min-width:0;}
+.rg-item .nm b{display:block;font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.35;}
+.rg-item .nm small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35;}
+.rg-item .pr{font-family:var(--disp);font-weight:600;font-size:13.5px;color:var(--teal-d);white-space:nowrap;}
+.rg-item .chev{color:var(--faint);flex-shrink:0;}
+.rg-hint{font-size:12px;color:var(--faint);margin-top:12px;}
+@media(max-width:380px){.rg-item .pr{display:none;}}
+
 /* ---------- toast ---------- */
 .toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);background:var(--ink);color:#fff;font-size:13.5px;line-height:1.4;padding:10px 16px;border-radius:12px;width:max-content;max-width:calc(100vw - 32px);text-align:center;box-shadow:0 12px 30px rgba(0,40,55,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60;}
 .toast.show{opacity:1;transform:translate(-50%,0);}
@@ -279,6 +296,7 @@ const PROD=KB.products.map(p=>{
   const base=[p.name,p.subName,p.category,p.tagline,p.description,(p.highlights||[]).join(' ')].join(' ');
   return {p, nameT:toks(p.name), docT:toks(base)};
 });
+const PROD_DOC={};PROD.forEach(x=>PROD_DOC[x.p.id]=x.docT);
 const GENS=KB.generalQuestions.map(g=>({g,t:toks(g.q)}));
 const QINDEX=[];
 PROD.forEach(x=>(x.p.questions||[]).forEach(q=>QINDEX.push({product:x.p,q,t:toks(q.q)})));
@@ -314,6 +332,12 @@ function answer(query){
   let bg=null,bgr=0;
   for(const gi of GENS){const o=overlap(qt,new Set(gi.t));const r=o/Math.max(gi.t.length,qt.length);if(o>=2&&r>bgr){bgr=r;bg=gi.g;}}
 
+  // range / list questions ("what are all the IOLs", "glaucoma drops", "list your sutures")
+  if(!np&&!(bg&&bgr>=0.6)){
+    const nq2=norm(query);
+    const specificName=bp&&PROD.find(x=>x.p===bp).nameT.some(w=>qset.has(w)&&!GENERIC_NAME.has(w)&&!LIST_PLURAL.test(w)&&!DIV_FACETS.some(f=>f[1].test(w))&&!SPEC_FACETS.some(f=>f[1].test(w)));
+    if(LIST_STRONG.test(nq2)||(LIST_PLURAL.test(nq2)&&!specificName)){const r=rangeAnswer(query,qt);if(r)return r;}
+  }
   // intent: brochure / price on a matched product (lead line, then the full card)
   if(bp&&bs>=3){
     if(isBroc)return mk(`Yes, here's the ${bp.name} brochure to share.`,bp);
@@ -358,6 +382,97 @@ function deriveFor(p,query){
 
 function mk(text,product,opt){return Object.assign({found:true,text:text||'',pid:product?product.id:null},opt||{});}
 function cleanHl(p){return (p.highlights||[]).map(h=>(h||'').trim()).filter(h=>h&&!/^n\/?a\.?$/i.test(h));}
+/* ---------------- product range / list questions ---------------- */
+function fixCat(c){return ({'Hyrophobic IOLs':'Hydrophobic IOLs','DIagnostic Equipment':'Diagnostic Equipment'})[c]||c;}
+const DIV_FACETS=[
+  ['IOL',/\b(iols?|intraocular|lens|lenses)\b/,'intraocular lenses (IOLs)'],
+  ['PHARMA',/\b(pharma\w*|drugs?|drops?|medicines?|ointments?|therapeutics?)\b/,'pharmaceutical products'],
+  ['SUTURE',/\bsutures?\b/,'sutures'],
+  ['EQUIPMENT',/\b(equipments?|machines?|instruments?)\b/,'equipment products'],
+  ['BLADE',/\b(blades?|knives|knife)\b/,'blades'],
+  ['OPTICALS',/\b(opticals?|frames?|spectacles?)\b/,'optical products']];
+const CAT_FACETS=[
+  [/\bhydrophilic\b/,c=>c==='Hydrophilic IOLs'],
+  [/\bhydrophobic\b/,c=>c==='Hyrophobic IOLs'],
+  [/\bpmma\b|poly ?methyl/,c=>c==='Poly Methyl Methacrylate'],
+  [/\bdyes?\b/,c=>c==='Diagnostic Dyes'],
+  [/\bdiagnostic (equipment|machines?|instruments?|devices?)\b/,c=>/diagnostic equipment/i.test(c)],
+  [/\bsurgical (equipment|machines?|instruments?)\b/,c=>c==='Surgical Equipment'],
+  [/\bsurgical devices?\b/,c=>c==='Surgical Devices'],
+  [/\btherapeutic\b/,c=>c==='Therapeutic Ranges'],
+  [/\bnon absorbable\b/,c=>c==='Non-absorbable Sutures'],
+  [/(^|[^n] )absorbable\b/,c=>c==='Absorbable Sutures'],
+  [/\bfluid management\b/,c=>c==='Fluid Management Devices'],
+  [/\bflat stock\b/,c=>c==='Flat Stock Blades'],
+  [/\bround stock\b/,c=>c==='Round Stock Blades']];
+const SPEC_FACETS=[
+  ['CATARACT',/\bcataract\b/],['RETINAL',/\b(retina|retinal|vitreo\w*)\b/],['CORNEAL',/\b(cornea|corneal)\b/],
+  ['GLAUCOMA',/\bglaucoma\b/],['ORBIT & OCULOPLASTY',/\b(orbit\w*|oculoplast\w*)\b/]];
+const LIST_STRONG=/\b(all|list|range|ranges|types|kinds|different|variet\w*|options|portfolio|catalog\w*|lineup|line up|full|entire|complete)\b/;
+const LIST_PLURAL=/\b(iols|lenses|sutures|blades|drops|dyes|products|equipment|equipments|machines|instruments|medicines|frames|ointments|devices)\b/;
+const GENERIC_NAME=new Set('aurolab auro eye eyes anti drops drop lens lenses iol iols'.split(' '));
+const LIST_WORDS=new Set('all list lists range ranges type types kind kinds different variety varieties option options portfolio catalog catalogue lineup line full entire complete available offer offers offering sell supply supplies have show give tell about which what product products aurolab there make manufacture please category categories'.split(' '));
+function stem(w){return w.replace(/(es|s)$/,'');}
+
+function rangeAnswer(query,qt){
+  const q=norm(query);
+  const divs=DIV_FACETS.filter(f=>f[1].test(q));
+  // "spectacle lens" is an optical, not an IOL
+  const divSet=new Set(divs.map(f=>f[0]).filter(d=>!(d==='IOL'&&/\b(spectacle|contact)\b/.test(q))));
+  const cats=CAT_FACETS.filter(f=>f[0].test(q)).map(f=>f[1]);
+  const specs=new Set(SPEC_FACETS.filter(f=>f[1].test(q)).map(f=>f[0]));
+  const all=/\b(products|portfolio|catalog\w*|everything)\b/.test(q);
+  if(!divSet.size&&!cats.length&&!specs.size&&!all)return null;
+  let list=KB.products.filter(p=>(!divSet.size||divSet.has(p.division))&&(!cats.length||cats.some(f=>f(p.category)))&&(!specs.size||specs.has(p.speciality)));
+  // leftover words ("antibiotic", "toric"...) narrow the list further when they match something
+  const facetWords=new Set();
+  [...DIV_FACETS.map(f=>f[1]),...CAT_FACETS.map(f=>f[0]),...SPEC_FACETS.map(f=>f[1])].forEach(re=>qt.forEach(w=>{if(re.test(w))facetWords.add(w);}));
+  ['drops','drop'].forEach(w=>facetWords.delete(w));
+  const catText=list.map(p=>p.category.toLowerCase()).join(' ');
+  const extra=qt.filter(w=>!LIST_WORDS.has(w)&&!facetWords.has(w)&&!/^(do|you|your|we|us|our|for|got|need|want|eye|eyes|me)$/.test(w)&&!catText.includes(w));
+  const used=[];
+  extra.forEach(w=>{const st=stem(w);const f=list.filter(p=>PBYID[p.id]&&PROD_DOC[p.id].some(d=>stem(d)===st));if(f.length&&f.length<list.length){list=f;used.push(w);}});
+  if(!list.length)return null;
+  if(list.length===1)return mk('',list[0]);
+  // what to call this set
+  let noun;
+  if(cats.length){const cs=[...new Set(list.map(p=>fixCat(p.category)))];noun=cs.length===1?cs[0]:'products';}
+  else if(divSet.size===1){noun=DIV_FACETS.find(f=>f[0]===[...divSet][0])[2];}
+  else noun='products';
+  const specTxt=specs.size?[...specs].map(s=>titleCase(s.toLowerCase())).join(' and ')+' ':'';
+  const shown=used.filter(w=>!/^drops?$/.test(w));
+  if(/\bdrops?\b/.test(q)&&divSet.size===1&&divSet.has('PHARMA')&&!cats.length)noun='eye drops';
+  const forTxt=shown.length?` for "${shown.join(' ')}"`:'';
+  const groupBy=divSet.size===1||cats.length?'category':'division';
+  const ng=new Set(list.map(p=>groupBy==='category'?fixCat(p.category):p.division)).size;
+  const lead=`Aurolab offers ${list.length} ${specTxt}${noun}${forTxt}`+(ng>1?`, across ${ng} ${groupBy==='category'?'types':'divisions'}.`:'.');
+  return {found:true,text:lead,list:list.map(p=>p.id),groupBy};
+}
+function rangeGroups(m){
+  const ps=(m.list||[]).map(id=>PBYID[id]).filter(Boolean);
+  const order=[],g={};
+  ps.forEach(p=>{const k=m.groupBy==='division'?((KB.divisions.find(d=>d.id===p.division)||{}).label||p.division):fixCat(p.category);if(!g[k]){g[k]=[];order.push(k);}g[k].push(p);});
+  return order.map(k=>[k,g[k]]);
+}
+function rangeEl(m){
+  const w=mkEl('div','range');
+  rangeGroups(m).forEach(([k,ps])=>{
+    const sec=mkEl('div','rg-group');const h=mkEl('h4',null,k);h.appendChild(mkEl('span',null,'· '+ps.length));sec.appendChild(h);
+    const ul=mkEl('div','rg-list');
+    ps.forEach(p=>{
+      const b=mkEl('button','rg-item');b.setAttribute('aria-label','Full details for '+p.name);
+      const dt=mkEl('span','dot');dt.style.background=specHex(p);b.appendChild(dt);
+      const nm=mkEl('span','nm');nm.appendChild(mkEl('b',null,p.name));nm.appendChild(mkEl('small',null,[p.subName,specLabel(p)].filter(Boolean).join(' · ')));b.appendChild(nm);
+      b.appendChild(mkEl('span','pr',p.priceDisplay));
+      const ch=mkEl('span','chev');ch.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';b.appendChild(ch);
+      b.onclick=()=>{$('#input').value='Tell me about '+p.name;send();};
+      ul.appendChild(b);
+    });
+    sec.appendChild(ul);w.appendChild(sec);
+  });
+  w.appendChild(mkEl('div','rg-hint','Tap any product for its full details, price and brochure. Prices are indicative.'));
+  return w;
+}
 function prodOf(m){return (m.pid&&PBYID[m.pid])||(m.product&&(PBYID[m.product.id]||m.product))||null;}
 
 /* ---------------- state + storage ---------------- */
@@ -403,7 +518,7 @@ function initials(n){return (n||DEMO_NAME).split(' ').filter(Boolean).map(x=>x[0
 /* ---------------- chat ---------------- */
 const SUGG=[
  "Are Aurolab products CE approved?","How much is the Aurolab Essence IOL?",
- "Which IOL do you recommend for astigmatism?","What is the AADI glaucoma implant?",
+ "What are all the IOLs available?","Which IOL do you recommend for astigmatism?","What is the AADI glaucoma implant?",
  "Do you have a brochure for Aurovue?","What silicone oils do you supply?",
  "What's the price of the Hummingbird Lite phaco?","Which IOL for scleral fixation?"];
 
@@ -451,9 +566,10 @@ function ansEl(m){
   const p=prodOf(m);
   if(m.text){const t=document.createElement('div');t.className=p?'lead':'txt';t.textContent=m.text;d.appendChild(t);}
   if(p)d.appendChild(productCard(p));
+  else if(m.list)d.appendChild(rangeEl(m));
   const meta=document.createElement('div');meta.className='meta';
   if(p){const sc=document.createElement('span');sc.className='src cat';const hx=specHex(p);sc.style.background=hx;if(SPEC_LIGHT[hx])sc.style.color='var(--ink)';sc.textContent='source · '+p.name;meta.appendChild(sc);}
-  else {const sc=document.createElement('span');sc.className='src';sc.textContent='source · Aurolab';meta.appendChild(sc);}
+  else {const sc=document.createElement('span');sc.className='src';sc.textContent=m.list?'source · Aurolab product range':'source · Aurolab';meta.appendChild(sc);}
   if(!p&&m.price){const pi=document.createElement('span');pi.className='price-ind';pi.textContent='indicative';meta.appendChild(pi);}
   const act=document.createElement('div');act.className='act';
   const cp=document.createElement('button');cp.title='Copy';cp.setAttribute('aria-label','Copy answer');cp.innerHTML=icon('copy');
@@ -497,7 +613,7 @@ function productCard(p){
   // key facts
   const facts=[];
   if(p.subName)facts.push(['Composition / type',p.subName]);
-  if(p.category)facts.push(['Category',p.category]);
+  if(p.category)facts.push(['Category',fixCat(p.category)]);
   facts.push(['Speciality',specLabel(p),'spec']);
   facts.push(['Price (INR)',p.priceDisplay,'price']);
   const g=mkEl('div','pc-facts');
@@ -535,12 +651,13 @@ function productCard(p){
 }
 /* the complete record as plain text, for Copy */
 function plainText(m,p){
+  if(m.list&&!p){const L=[m.text];rangeGroups(m).forEach(([k,ps])=>{L.push('',k+':');ps.forEach(x=>L.push('• '+x.name+(x.subName?' ('+x.subName+')':'')+', '+x.priceDisplay));});L.push('','Prices are indicative.');return L.join('\n');}
   if(!p)return m.text;
   const L=[];
   if(m.text)L.push(m.text,'');
   L.push(p.name);const wi=whatItIs(p);if(wi)L.push(wi);L.push('');
   if(p.subName)L.push('Composition / type: '+p.subName);
-  if(p.category)L.push('Category: '+p.category);
+  if(p.category)L.push('Category: '+fixCat(p.category));
   L.push('Speciality: '+specLabel(p));
   L.push('Price: '+p.priceDisplay+' (indicative)');
   const desc=tidyLines(p.description);if(desc)L.push('',desc);
@@ -550,6 +667,7 @@ function plainText(m,p){
 }
 /* what read-aloud says: the lead, what it is, the description and the price */
 function spokenText(m,p){
+  if(m.list&&!p)return m.text+' '+rangeGroups(m).map(([k,ps])=>k+': '+ps.map(x=>x.name).join(', ')+'.').join(' ');
   if(!p)return m.text;
   const end=t=>/[.!?:]$/.test(t)?t:t+'.';
   const parts=[];
