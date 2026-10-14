@@ -139,6 +139,27 @@ tr:last-child td{border-bottom:none;}
 .modal h3{font-size:17px;margin-bottom:16px;color:var(--teal-d);}
 @media(max-width:1000px){.stat-row{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}.ctab{grid-template-columns:1fr;height:auto;}.ed-grid{grid-template-columns:1fr;}.ed-field.full{grid-column:1;}}
 
+/* ---------- dashboard loading ---------- */
+.dash-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.dash-head .upd{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px;}
+.dash-head .upd i{width:7px;height:7px;border-radius:50%;background:var(--faint);}
+.dash-head .upd.ok i{background:#28C76F;}
+.refresh{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--teal);background:#fff;border:1px solid var(--line);padding:7px 13px;border-radius:9px;transition:all .14s;}
+.refresh:hover:not(:disabled){background:var(--teal);border-color:var(--teal);color:#fff;}
+.refresh:disabled{cursor:default;color:var(--muted);}
+.refresh.busy svg{animation:spin .8s linear infinite;}
+.ld-slot.sv:not(.in){min-height:72px;}
+.ld-slot.pc:not(.in){min-height:166px;}
+.ld-slot.pt:not(.in){min-height:166px;}
+.ld-slot.pg:not(.in){min-height:150px;}
+.ld{display:flex;align-items:center;justify-content:center;min-height:inherit;}
+.ld-spin{width:24px;height:24px;border-radius:50%;border:2.5px solid var(--chip);border-top-color:var(--teal);animation:spin .75s linear infinite;}
+.ld-slot.sv .ld-spin{width:20px;height:20px;}
+.ld-slot.in>*{animation:ldIn .4s ease both;}
+.bar.grow{animation:grow .6s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes ldIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+@keyframes grow{from{height:0;}}
+
 /* ---------- loading screen ---------- */
 .boot{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
   background:radial-gradient(900px 520px at 50% 38%,#0B7A99 0%,#006380 48%,#004C63 100%);transition:opacity .38s ease;}
@@ -271,17 +292,37 @@ function go(t){TAB=t;document.querySelectorAll('.nav button').forEach(b=>b.class
 function statsData(){
   const s=JSON.parse(localStorage.getItem('al_stats')||'{}');
   const days=[];for(let i=13;i>=0;i--){const d=new Date(Date.now()-i*864e5);const k=d.toISOString().slice(0,10);
-    const seed=38+Math.round(26*Math.sin(i*0.9)+Math.random()*10);days.push({k,label:d.toLocaleDateString('en-IN',{day:'numeric'}),v:(s[k]||0)+Math.max(12,seed)});}
+    let h=0;for(const ch of k)h=(h*31+ch.charCodeAt(0))%997;
+    const seed=38+Math.round(26*Math.sin(i*0.9)+h%10);days.push({k,label:d.toLocaleDateString('en-IN',{day:'numeric'}),v:(s[k]||0)+Math.max(12,seed)});}
   return days;
 }
+let dashTok=0;
+const SPIN='<div class="ld"><span class="ld-spin"></span></div>';
+const REFRESH_ICON='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+/* boxes render straight away with a spinner inside; their data arrives over ~2 seconds */
 function renderDash(){
+  const tok=++dashTok;
+  clearInterval(window._liveT);
+  $('#view').innerHTML=`
+   <div class="dash-head"><div class="upd" id="dashUpd"><i></i>Fetching latest activity…</div><button class="refresh busy" id="dashRef" onclick="renderDash()" disabled>${REFRESH_ICON}Refresh</button></div>
+   <div class="stat-row">
+     <div class="stat"><div class="k"><span class="live-dot"></span>Active chats now</div><div class="ld-slot sv" id="sActive">${SPIN}</div></div>
+     <div class="stat"><div class="k">Chats today</div><div class="ld-slot sv" id="sToday">${SPIN}</div></div>
+     <div class="stat"><div class="k">Questions this week</div><div class="ld-slot sv" id="sWeek">${SPIN}</div></div>
+     <div class="stat"><div class="k">Gaps to fill</div><div class="ld-slot sv" id="sGaps">${SPIN}</div></div>
+   </div>
+   <div class="grid2">
+     <div class="panel"><h3>Questions per day · last 14 days</h3><div class="ld-slot pc" id="pChart">${SPIN}</div></div>
+     <div class="panel"><h3>Most asked about</h3><div class="ld-slot pt" id="pTop">${SPIN}</div></div>
+   </div>
+   <div class="panel" style="margin-top:16px"><h3>Gaps to fill <span style="font-size:12px;font-weight:500;color:var(--faint)">· questions the assistant could not answer</span></h3><div class="ld-slot pg" id="pGaps">${SPIN}</div></div>`;
+
   const days=statsData();const today=days[days.length-1].v;
   const week=days.slice(-7).reduce((a,b)=>a+b.v,0);
   const gaps=JSON.parse(localStorage.getItem('al_gaps')||'[]');
   const seededGaps=[{q:'Do you have a disposable vitrectomy cutter?'},{q:'Is the Dfine IOL available in a toric version?'},{q:'What is the warranty on the Falcon-i microscope?'},{q:'Do you supply OT consumables as a bundle?'}];
   const allGaps=[...gaps,...seededGaps].slice(0,6);
   const active=3+Math.floor(Math.random()*5);
-  // top products
   // baseline field counts plus every product answer given in the rep app (al_hits)
   const base={'Aurolab Essence':130,'Aurovue':113,'AADI 350':96,'Aurosil 1500':79,'Aurolab Dfine':62,'Aurolab Polycryl':46};
   const hits=JSON.parse(localStorage.getItem('al_hits')||'{}');
@@ -289,21 +330,23 @@ function renderDash(){
   const tp=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,6).map(id=>{const p=KB.products.find(x=>x.id===id);return [p.name,p.speciality,counts[id]];});
   const tpMax=tp.length?tp[0][2]:1;
   const max=92;
-  $('#view').innerHTML=`
-   <div class="stat-row">
-     <div class="stat"><div class="k"><span class="live-dot"></span>Active chats now</div><div class="v" id="liveN">${active}</div><div class="d">across the field team</div></div>
-     <div class="stat"><div class="k">Chats today</div><div class="v">${today}</div><div class="d">${REPS.filter(r=>r.on).length} reps active</div></div>
-     <div class="stat"><div class="k">Questions this week</div><div class="v">${week.toLocaleString('en-IN')}</div><div class="d">last 7 days</div></div>
-     <div class="stat"><div class="k">Gaps to fill</div><div class="v" style="color:var(--retina)">${allGaps.length}</div><div class="d">unanswered questions</div></div>
-   </div>
-   <div class="grid2">
-     <div class="panel"><h3>Questions per day · last 14 days</h3><div class="chart">${days.map(d=>`<div class="bar" style="height:${Math.round(d.v/max*100)}%"><span>${d.label}</span></div>`).join('')}</div><div style="height:16px"></div></div>
-     <div class="panel"><h3>Most asked about</h3><div class="toplist">${tp.map(t=>{const pct=Math.max(4,Math.round(t[2]/tpMax*100));const c=specColor(t[1]);return `<div class="row"><span class="dot" style="background:${c}"></span><span class="nm">${t[0]}</span><span class="track"><span class="fill" style="width:${pct}%;background:${c}"></span></span><span class="ct">${t[2].toLocaleString('en-IN')}</span></div>`;}).join('')}</div></div>
-   </div>
-   <div class="panel" style="margin-top:16px"><h3>Gaps to fill <span style="font-size:12px;font-weight:500;color:var(--faint)">· questions the assistant could not answer</span></h3>
-     ${allGaps.map(g=>`<div class="gap-row"><span class="q">${esc(g.q)}</span><button onclick="go('content')">Add answer &rarr;</button></div>`).join('')||'<div style="color:var(--faint);font-size:13px;padding:8px 0">No gaps. Nice.</div>'}
-   </div>`;
-  let n=active;clearInterval(window._liveT);window._liveT=setInterval(()=>{if(TAB!=='dash')return;n=Math.max(2,Math.min(9,n+(Math.random()<.5?-1:1)));const el=$('#liveN');if(el)el.textContent=n;},3800);
+
+  const live=()=>tok===dashTok&&TAB==='dash';
+  const fill=(id,html,ms,after)=>setTimeout(()=>{if(!live())return;const el=$('#'+id);if(!el)return;el.innerHTML=html;el.classList.add('in');after&&after(el);},ms);
+  fill('sActive',`<div class="v" id="liveN">${active}</div><div class="d">across the field team</div>`,1200);
+  fill('sToday',`<div class="v">${today}</div><div class="d">${REPS.filter(r=>r.on).length} reps active</div>`,1400);
+  fill('sWeek',`<div class="v">${week.toLocaleString('en-IN')}</div><div class="d">last 7 days</div>`,1600);
+  fill('sGaps',`<div class="v" style="color:var(--retina)">${allGaps.length}</div><div class="d">unanswered questions</div>`,1750);
+  fill('pChart',`<div class="chart">${days.map((d,i)=>`<div class="bar grow" style="height:${Math.round(d.v/max*100)}%;animation-delay:${i*35}ms"><span>${d.label}</span></div>`).join('')}</div><div style="height:16px"></div>`,1850);
+  fill('pTop',`<div class="toplist">${tp.map(t=>{const pct=Math.max(4,Math.round(t[2]/tpMax*100));const c=specColor(t[1]);return `<div class="row"><span class="dot" style="background:${c}"></span><span class="nm">${esc(t[0])}</span><span class="track"><span class="fill" data-w="${pct}" style="width:0;background:${c}"></span></span><span class="ct">${t[2].toLocaleString('en-IN')}</span></div>`;}).join('')}</div>`,
+    2000,el=>requestAnimationFrame(()=>requestAnimationFrame(()=>el.querySelectorAll('.fill').forEach(f=>f.style.width=f.dataset.w+'%'))));
+  fill('pGaps',allGaps.map(g=>`<div class="gap-row"><span class="q">${esc(g.q)}</span><button onclick="go('content')">Add answer &rarr;</button></div>`).join('')||'<div style="color:var(--faint);font-size:13px;padding:8px 0">No gaps. Nice.</div>',2150);
+  setTimeout(()=>{
+    if(!live())return;
+    const r=$('#dashRef');r.classList.remove('busy');r.disabled=false;
+    const u=$('#dashUpd');u.classList.add('ok');u.innerHTML='<i></i>Updated '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    let n=active;window._liveT=setInterval(()=>{if(TAB!=='dash')return;n=Math.max(2,Math.min(9,n+(Math.random()<.5?-1:1)));const el=$('#liveN');if(el)el.textContent=n;},3800);
+  },2250);
 }
 
 /* ---------- users ---------- */
