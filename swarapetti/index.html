@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Swarapetti</title>
+  <meta name="description" content="A Carnatic melody instrument with shruti, ragams, gamakas and talam." />
+  <meta name="theme-color" content="#2a0b10" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Swarapetti" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Manrope:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <header class="bar">
+      <div class="wordmark" aria-label="Swarapetti">Swarapetti</div>
+      <button class="ragam-chip" id="ragamBtn" type="button" aria-haspopup="dialog">
+        <span class="rc-label">Ragam</span>
+        <span class="rc-name" id="ragamName">Mayamalavagowla</span>
+        <span class="rc-meta" id="ragamMeta">Melakarta 15</span>
+      </button>
+      <nav class="bar-actions">
+        <button class="bar-btn" id="learnBtn" type="button">Learn</button>
+        <button class="bar-btn" id="settingsBtn" type="button">Settings</button>
+      </nav>
+    </header>
+
+    <main id="stage">
+      <section class="petti" id="petti" aria-label="Instrument">
+
+        <!-- Display -->
+        <div class="p-display panel-ivory">
+          <div class="d-top">
+            <span id="dSthayi" class="d-sthayi">Madhya sthayi</span>
+            <span id="dGamaka" class="d-gamaka"></span>
+          </div>
+          <div class="d-main">
+            <div class="d-swara" id="scrSwara" aria-live="polite">S</div>
+            <div class="d-names">
+              <div class="d-name" id="dName">Shadjam</div>
+              <div class="d-western" id="dWestern"></div>
+            </div>
+          </div>
+          <div class="d-scales">
+            <div class="d-scale"><span class="d-dir" aria-label="Arohanam">↑</span><span id="dAro" class="d-tokens"></span></div>
+            <div class="d-scale"><span class="d-dir" aria-label="Avarohanam">↓</span><span id="dAvaro" class="d-tokens"></span></div>
+          </div>
+        </div>
+
+        <!-- Drone -->
+        <div class="p-drone panel-wood">
+          <div class="panel-head">
+            <h2>Shruti</h2>
+            <label class="switch" title="Drone on or off"><input type="checkbox" id="droneOn" checked /><span></span></label>
+          </div>
+          <div class="kattai">
+            <button class="round-btn" id="kattaiDown" type="button" aria-label="Lower kattai">−</button>
+            <div class="kattai-read">
+              <div class="kattai-num"><span id="kattaiVal">1½</span> <small>kattai</small></div>
+              <div class="kattai-west" id="kattaiWest">C♯3 · 138.6 Hz</div>
+            </div>
+            <button class="round-btn" id="kattaiUp" type="button" aria-label="Higher kattai">+</button>
+          </div>
+          <div class="fine">
+            <label for="fineCents">Fine tune</label>
+            <input type="range" id="fineCents" min="-50" max="50" step="1" value="0" />
+            <output id="fineVal">0 ¢</output>
+          </div>
+          <div class="seg" id="droneType" role="radiogroup" aria-label="Drone instrument">
+            <button type="button" data-v="tanpura" role="radio">Tanpura</button>
+            <button type="button" data-v="shruti" role="radio">Shruti box</button>
+          </div>
+          <div class="seg small" id="droneSetting" role="radiogroup" aria-label="Drone notes"></div>
+          <div class="drone-foot">
+            <canvas id="droneViz" width="120" height="48" aria-hidden="true"></canvas>
+            <div class="vol">
+              <label for="droneVol">Volume</label>
+              <input type="range" id="droneVol" min="0" max="1" step="0.01" value="0.6" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Talam -->
+        <div class="p-talam panel-wood">
+          <div class="talam-row">
+            <button class="play-btn" id="talamPlay" type="button" aria-pressed="false"><span class="pi" aria-hidden="true"></span><span class="pl">Talam</span></button>
+            <div class="talam-name"><span id="talamName">Adi</span> <small id="talamMeta">8 beats · chatusram</small></div>
+            <div class="avartanam" id="avartanam" aria-live="off"></div>
+          </div>
+          <div class="kriyas" id="kriyas" aria-label="Talam gestures"></div>
+        </div>
+
+        <!-- Joystick -->
+        <div class="p-stick panel-wood">
+          <div class="joystick" id="joy" aria-label="Sthayi and gamaka stick">
+            <span class="jl u">Mel</span>
+            <span class="jl d">Mandra</span>
+            <span class="jl l">Nokku</span>
+            <span class="jl r">Kampitam</span>
+            <span class="jl ul">Orikkai</span>
+            <span class="jl ur">Jaru ↑</span>
+            <span class="jl dl">Sphuritam</span>
+            <span class="jl dr">Jaru ↓</span>
+            <div class="joy-well"><div class="joy-guide" id="joyGuide"></div><div class="joy-knob" id="joyKnob"></div></div>
+            <button class="joy-lock" id="joyLock" type="button" aria-pressed="false" aria-label="Latch the stick" title="Latch: the stick stays where you leave it (L)">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.6"/><path class="shackle" d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2"/></svg>
+              <span>Latch</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Swara keys -->
+        <div class="p-keys" id="keys" role="group" aria-label="Swaras"></div>
+
+        <!-- Controls -->
+        <div class="p-controls panel-wood">
+          <label class="field"><span>Instrument</span><select id="voiceSel"></select></label>
+          <label class="field"><span>Talam</span><select id="talamSel"></select></label>
+          <label class="field"><span>Nadai</span><select id="nadaiSel"></select></label>
+          <label class="field"><span>Kalam</span><select id="kalamSel"></select></label>
+          <label class="field"><span>Percussion</span><select id="percSel"></select></label>
+          <div class="field tempo"><span>Tempo <output id="tempoVal">70</output></span><input type="range" id="tempo" min="40" max="160" step="1" value="70" aria-label="Tempo, beats per minute" /></div>
+          <div class="looper" role="group" aria-label="Looper">
+            <button class="loop-btn rec" id="recBtn" type="button"><i></i>Rec</button>
+            <button class="loop-btn" id="playBtn" type="button" disabled>Play</button>
+            <button class="loop-btn" id="clearBtn" type="button" disabled>Clear</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside id="learn" class="panel" aria-hidden="true" aria-label="Learn">
+      <div class="panel-inner">
+        <div class="sheet-head">
+          <h2 id="learnTitle">Learn</h2>
+          <button class="close" id="learnClose" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="panel-body" id="learnBody"></div>
+      </div>
+    </aside>
+
+    <div id="ragamSheet" class="sheet" role="dialog" aria-modal="true" aria-label="Choose a ragam" aria-hidden="true">
+      <div class="sheet-card wide">
+        <div class="sheet-head">
+          <h2>Choose a ragam</h2>
+          <button class="close" id="ragamClose" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="ragam-tools">
+          <input type="search" id="ragamSearch" placeholder="Search by name, number or parent" autocomplete="off" spellcheck="false" />
+          <div class="seg" id="ragamFilter" role="radiogroup" aria-label="Filter">
+            <button type="button" data-v="all" role="radio">All</button>
+            <button type="button" data-v="melakarta" role="radio">Melakarta</button>
+            <button type="button" data-v="janya" role="radio">Janya</button>
+          </div>
+        </div>
+        <div class="ragam-list" id="ragamList"></div>
+      </div>
+    </div>
+
+    <div id="settings" class="sheet" role="dialog" aria-modal="true" aria-label="Settings" aria-hidden="true">
+      <div class="sheet-card">
+        <div class="sheet-head">
+          <h2>Settings</h2>
+          <button class="close" id="settingsClose" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="sheet-body">
+          <section>
+            <h3>Swara names</h3>
+            <div class="seg" id="notationSeg" role="radiogroup" aria-label="Notation">
+              <button type="button" data-v="carnatic" role="radio">S R G</button>
+              <button type="button" data-v="tamil" role="radio">தமிழ்</button>
+            </div>
+            <label class="check"><input type="checkbox" id="optWestern" /> Also show Western note names</label>
+          </section>
+          <section>
+            <h3>Tuning</h3>
+            <div class="seg" id="tuningSeg" role="radiogroup" aria-label="Tuning">
+              <button type="button" data-v="just" role="radio">Natural</button>
+              <button type="button" data-v="equal" role="radio">Equal tempered</button>
+            </div>
+            <p class="hint">Natural tuning sets each swara by pure ratios against Sa, as it sounds against a tanpura. Equal tempered matches a keyboard or harmonium.</p>
+          </section>
+          <section>
+            <h3>Register of Sa</h3>
+            <div class="seg" id="octaveSeg" role="radiogroup" aria-label="Register of Sa">
+              <button type="button" data-v="3" role="radio">Lower (C3 to B3)</button>
+              <button type="button" data-v="4" role="radio">Higher (C4 to B4)</button>
+            </div>
+            <p class="hint">Men usually keep Sa in the lower register, often around 1 to 2½ kattai. Choose whatever sits comfortably for the voice or instrument you play along with.</p>
+          </section>
+          <section>
+            <h3>Tanpura first string</h3>
+            <div class="seg small" id="firstStringSeg" role="radiogroup" aria-label="Tanpura first string">
+              <button type="button" data-v="auto" role="radio">Auto</button>
+              <button type="button" data-v="pa" role="radio">Pa</button>
+              <button type="button" data-v="ma" role="radio">Ma</button>
+              <button type="button" data-v="ni" role="radio">Ni</button>
+            </div>
+            <p class="hint">Auto tunes it to Pa, or to Ma or Ni for ragams without Pa.</p>
+          </section>
+          <section>
+            <h3>Hints</h3>
+            <label class="check"><input type="checkbox" id="optPath" /> Show where the ragam goes next (small arrows on the keys)</label>
+          </section>
+          <section>
+            <h3>Progress</h3>
+            <button class="plain" id="resetProgress" type="button">Reset lesson progress</button>
+          </section>
+          <section class="about">
+            <p>Keyboard: 1 to 7 for Sa to Ni, 8 for upper Sa, arrows or WASD for the stick, L to latch it, T to start or stop the talam.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="welcome" class="welcome">
+      <div class="welcome-card">
+        <div class="w-mark">Swarapetti</div>
+        <p class="w-sub" id="welcomeSub">A Carnatic melody instrument. Set your Sa, choose a ragam, and play.</p>
+        <div class="w-tip"><span>Today</span><p id="tipText"></p></div>
+        <button class="w-start" id="welcomeStart" type="button">Tap to begin</button>
+        <p class="w-small">The tanpura starts softly. Headphones are lovely, but not needed.</p>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

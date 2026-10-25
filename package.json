@@ -4,13 +4,15 @@
   "description": "A pocket chord synth for the iPad",
   "scripts": {
     "dev": "vite --host",
-    "build": "vite build",
+    "build": "vite build && vite build --config swarapetti/vite.config.js",
     "preview": "vite preview --host",
     "test:theory": "node scripts/test-theory.mjs",
     "test:ipad": "node scripts/ipad-test.mjs shots",
     "icons": "node scripts/make-icons.mjs",
     "test:joystick": "node scripts/test-joystick.mjs",
-    "test:joystick:browser": "node scripts/joystick-browser-test.mjs http://localhost:4173/ jahanchord"
+    "test:joystick:browser": "node scripts/joystick-browser-test.mjs http://localhost:4173/ jahanchord",
+    "dev:swarapetti": "vite --config swarapetti/vite.config.js --host",
+    "test:swarapetti": "node swarapetti/tests/theory.test.mjs && node swarapetti/tests/render.test.mjs"
   },
   "repository": {
     "type": "git",
