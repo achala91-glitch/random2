@@ -1,6 +1,6 @@
 // Offline support: the page itself is network-first (so updates show up),
 // everything else is served from cache and refreshed in the background.
-const CACHE = 'jahanchord-v1';
+const CACHE = 'jahanchord-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest'])).then(() => self.skipWaiting()));
@@ -17,6 +17,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // Swarapetti lives under /swarapetti/ with its own service worker; leave it alone.
+  if (new URL(req.url).pathname.includes('/swarapetti/')) return;
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req)

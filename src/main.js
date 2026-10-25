@@ -7,6 +7,7 @@ import { PRESETS, presetIndex } from './presets.js';
 import { KITS, BEATS } from './drums.js';
 import { LESSONS, tipOfTheDay } from './lessons.js';
 import { Commentary } from './commentary.js';
+import { createJoystick, DIR_ANGLE } from '../shared/joystick.js';
 import { store, save, saveNow, dayString } from './storage.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -153,82 +154,30 @@ for (const b of chordBtns) {
 }
 
 // ---------------------------------------------------------------- joystick
+// Shared Pointer Events joystick: touch, mouse and trackpad, with latch mode.
 const joy = $('#joy');
 const knob = $('#joyKnob');
-let joyPointer = null;
-const DIR_BY_SECTOR = ['r', 'dr', 'd', 'dl', 'l', 'ul', 'u', 'ur'];
-const DIR_ANGLE = { r: 0, dr: 45, d: 90, dl: 135, l: 180, ul: 225, u: 270, ur: 315 };
-
-function joyMove(e) {
-  const well = joy.querySelector('.joy-well').getBoundingClientRect();
-  const cx = well.left + well.width / 2;
-  const cy = well.top + well.height / 2;
-  let dx = (e.clientX - cx) / scale;
-  let dy = (e.clientY - cy) / scale;
-  const R = 52;
-  const dist = Math.hypot(dx, dy);
-  if (dist > R) { dx *= R / dist; dy *= R / dist; }
-  knob.style.transform = `translate(${dx}px, ${dy}px)`;
-  if (dist < R * 0.38) { setJoyDir('c'); return; }
-  const ang = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-  // A little hysteresis so it doesn't flicker on the diagonals.
-  if (joyDir !== 'c') {
-    const diff = Math.abs(((ang - DIR_ANGLE[joyDir] + 540) % 360) - 180);
-    if (diff < 22.5 + 7) return;
-  }
-  setJoyDir(DIR_BY_SECTOR[Math.round(ang / 45) % 8]);
-}
-function joyRelease(e) {
-  if (e.pointerId !== joyPointer) return;
-  joyPointer = null;
-  joy.classList.remove('dragging');
-  knob.style.transform = 'translate(0px, 0px)';
-  setJoyDir('c');
-}
-joy.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  if (joyPointer !== null) return;
-  joyPointer = e.pointerId;
-  try { joy.setPointerCapture(e.pointerId); } catch { /* ignore */ }
-  joy.classList.add('dragging');
-  joyMove(e);
+const stick = createJoystick({
+  el: joy,
+  well: joy.querySelector('.joy-well'),
+  knob,
+  lockBtn: $('#joyLock'),
+  radius: 52,
+  getScale: () => scale,
+  enabled: () => started,
+  onChange: (dir) => setJoyDir(dir),
 });
-joy.addEventListener('pointermove', (e) => { if (e.pointerId === joyPointer) joyMove(e); });
-joy.addEventListener('pointerup', joyRelease);
-joy.addEventListener('pointercancel', joyRelease);
-joy.addEventListener('lostpointercapture', joyRelease);
 
 // ---------------------------------------------------------------- keyboard (for laptops)
-const arrows = new Set();
-function arrowsToDir() {
-  const u = arrows.has('ArrowUp'); const d = arrows.has('ArrowDown');
-  const l = arrows.has('ArrowLeft'); const r = arrows.has('ArrowRight');
-  const v = u && !d ? 'u' : d && !u ? 'd' : '';
-  const h = l && !r ? 'l' : r && !l ? 'r' : '';
-  return (v + h) || 'c';
-}
+// Arrows / WASD move the stick and L toggles latch (handled by the joystick module).
 window.addEventListener('keydown', (e) => {
   if (e.repeat || e.metaKey || e.ctrlKey) return;
+  if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if (!started && (e.key === 'Enter' || e.key === ' ')) { startApp(); return; }
   if (/^[1-7]$/.test(e.key)) { pressChord(Number(e.key), `k${e.key}`); e.preventDefault(); }
-  if (e.key.startsWith('Arrow')) {
-    arrows.add(e.key);
-    const dir = arrowsToDir();
-    const a = DIR_ANGLE[dir];
-    knob.style.transform = dir === 'c' ? '' : `translate(${Math.cos(a * Math.PI / 180) * 44}px, ${Math.sin(a * Math.PI / 180) * 44}px)`;
-    setJoyDir(dir);
-    e.preventDefault();
-  }
 });
 window.addEventListener('keyup', (e) => {
   if (/^[1-7]$/.test(e.key)) releaseChord(`k${e.key}`);
-  if (e.key.startsWith('Arrow')) {
-    arrows.delete(e.key);
-    const dir = arrowsToDir();
-    const a = DIR_ANGLE[dir];
-    knob.style.transform = dir === 'c' ? 'translate(0px, 0px)' : `translate(${Math.cos(a * Math.PI / 180) * 44}px, ${Math.sin(a * Math.PI / 180) * 44}px)`;
-    setJoyDir(dir);
-  }
 });
 
 // ---------------------------------------------------------------- screen
